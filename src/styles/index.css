@@ -73,8 +73,12 @@ a {
   padding: 28px 18px;
 }
 
-.view {
+.app-frame {
   width: min(100%, 1220px);
+}
+
+.view {
+  width: 100%;
 }
 
 .view-home {
@@ -152,9 +156,16 @@ a {
   letter-spacing: -0.04em;
 }
 
+.hero-kicker {
+  margin: 14px 0 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 .hero-subtitle {
   max-width: 40rem;
-  margin: 18px 0 0;
+  margin: 14px 0 0;
   font-size: 1.1rem;
   line-height: 1.8;
   color: var(--muted);
@@ -303,15 +314,16 @@ a {
 }
 
 .dot-progress {
-  display: grid;
-  grid-template-columns: repeat(15, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 26px 0 24px;
 }
 
 .dot-button {
-  width: 100%;
-  aspect-ratio: 1 / 1;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
   border-radius: 999px;
   border: 0;
   background: var(--dot-idle);
@@ -325,7 +337,7 @@ a {
 .dot-button.is-current {
   background: var(--dot-current);
   box-shadow:
-    0 0 0 4px rgba(255, 79, 163, 0.18),
+    0 0 0 3px rgba(255, 79, 163, 0.18),
     inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
@@ -558,6 +570,49 @@ a {
   margin-top: 22px;
 }
 
+.share-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(17, 17, 17, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+.share-card {
+  width: min(100%, 620px);
+  max-height: 92svh;
+  overflow: auto;
+  padding: 20px;
+  border-radius: 28px;
+  background: rgba(255, 251, 246, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.24);
+}
+
+.share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.share-header h3 {
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+.share-preview {
+  width: 100%;
+  margin-top: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
 .logic-modal {
   position: fixed;
   inset: 0;
@@ -707,6 +762,23 @@ a {
   color: var(--text);
 }
 
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: center;
+  margin-top: 16px;
+  padding: 0 10px 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}
+
+.site-footer a {
+  color: var(--muted);
+}
+
 @media (max-width: 1180px) {
   .home-grid,
   .result-hero,
@@ -746,7 +818,8 @@ a {
   .quiz-headline,
   .model-panel-header,
   .dimension-header,
-  .logic-sheet-header {
+  .logic-sheet-header,
+  .share-header {
     flex-direction: column;
     align-items: flex-start;
   }

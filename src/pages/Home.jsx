@@ -126,15 +126,15 @@ function LogicModal({ onClose }) {
         <div className="logic-footnote">
           <div className="logic-mini-panel">
             <strong>判定原则</strong>
-            <p>先算 15 维百分比，再汇总 5 模型，最后和 28 个原型的“高维/低维/中位”特征做匹配。</p>
+            <p>先算 15 维百分比，再汇总 5 模型，最后和 28 个原型的高维、低维、中位特征做匹配。</p>
           </div>
           <div className="logic-mini-panel">
             <strong>为什么有效</strong>
-            <p>同一题无论排第几题都只记自己的维度权重，所以“随机顺序”不会让结果随机漂移。</p>
+            <p>同一题无论排第几题都只记自己的维度权重，所以随机顺序不会让结果随机漂移。</p>
           </div>
           <div className="logic-mini-panel">
             <strong>边界说明</strong>
-            <p>这是行为风格建模，不是医学诊断；它追求可解释、可复盘，而不是神秘玄学命中。</p>
+            <p>这是行为风格建模，不是医学诊断；它追求可解释、可复盘，而不是玄学抽签。</p>
           </div>
         </div>
       </div>
@@ -148,7 +148,8 @@ function Home({ onStart, logicOpen, onOpenLogic, onCloseLogic }) {
       <div className="home-grid">
         <div className="panel hero-panel">
           <p className="eyebrow">LOVE-TI / RELATIONSHIP ARCHETYPE TEST</p>
-          <h1>恋爱人格测试，不靠瞎猜，靠可解释的权重结构。</h1>
+          <h1>LOVE-TI恋爱人格测试</h1>
+          <p className="hero-kicker">不靠瞎猜，靠可解释的权重结构。</p>
           <p className="hero-subtitle">
             30 道有梗题，把你的恋爱脑拆成 5 大心理模型、15 个评估维度，再映射到 28 种人格原型。
           </p>

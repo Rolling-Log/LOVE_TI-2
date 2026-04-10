@@ -1,4 +1,4 @@
-function Result({ result, onRestart, onRetake }) {
+function Result({ result, onRestart, onRetake, onGenerateShare, shareImage, onCloseShare }) {
   const { personality, topDimensions, lowDimensions, topModels, modelCards, explainers } = result;
 
   return (
@@ -89,7 +89,10 @@ function Result({ result, onRestart, onRetake }) {
         </div>
 
         <div className="action-row">
-          <button type="button" className="primary-button" onClick={onRetake}>
+          <button type="button" className="primary-button" onClick={onGenerateShare}>
+            分享我的恋爱人格
+          </button>
+          <button type="button" className="secondary-button" onClick={onRetake}>
             再测一次
           </button>
           <button type="button" className="secondary-button" onClick={onRestart}>
@@ -97,6 +100,33 @@ function Result({ result, onRestart, onRetake }) {
           </button>
         </div>
       </div>
+
+      {shareImage ? (
+        <div className="share-modal" role="dialog" aria-modal="true" aria-label="分享卡片预览">
+          <div className="share-card">
+            <div className="share-header">
+              <div>
+                <p className="eyebrow">SHARE CARD</p>
+                <h3>可下载的竖版 A4 分享卡</h3>
+              </div>
+              <button type="button" className="icon-button" onClick={onCloseShare} aria-label="关闭预览">
+                ×
+              </button>
+            </div>
+
+            <img src={shareImage} alt={`${personality.name}分享卡`} className="share-preview" />
+
+            <div className="action-row">
+              <a className="primary-button" href={shareImage} download={`love-ti-${personality.code}.png`}>
+                下载图片
+              </a>
+              <button type="button" className="secondary-button" onClick={onCloseShare}>
+                关闭预览
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
