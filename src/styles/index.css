@@ -278,6 +278,15 @@ a {
   padding: 28px;
 }
 
+.hero-panel,
+.home-side-panel,
+.quiz-panel,
+.result-panel,
+.share-card {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .quiz-headline {
   display: flex;
   align-items: flex-start;
@@ -797,6 +806,59 @@ a {
   }
 }
 
+@media (max-width: 920px) {
+  .app-shell {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .app-frame {
+    width: min(100%, 560px);
+  }
+
+  .home-grid,
+  .result-hero,
+  .result-summary-grid,
+  .logic-footnote {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .quiz-headline {
+    flex-direction: column;
+  }
+
+  .quiz-status {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .result-description {
+    max-width: none;
+  }
+
+  .portrait-card {
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  .share-modal,
+  .logic-modal {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .share-card,
+  .logic-sheet {
+    width: 100%;
+    max-height: calc(100svh - 24px);
+    border-radius: 22px;
+  }
+}
+
 @media (max-width: 760px) {
   .app-shell {
     padding: 16px;
@@ -810,9 +872,12 @@ a {
     padding: 20px;
   }
 
-  .stat-row,
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dot-progress {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px 8px;
   }
 
   .quiz-headline,
@@ -851,6 +916,48 @@ a {
   .primary-button,
   .secondary-button {
     width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero-panel h1,
+  .result-code {
+    line-height: 1;
+  }
+
+  .quiz-panel,
+  .result-panel,
+  .hero-panel,
+  .home-side-panel,
+  .logic-sheet,
+  .share-card {
+    padding: 16px;
+  }
+
+  .quiz-question {
+    font-size: clamp(1.45rem, 8vw, 2.1rem);
+  }
+
+  .result-name {
+    font-size: 1.3rem;
+  }
+
+  .result-description,
+  .result-copy,
+  .summary-panel p,
+  .logic-card p,
+  .trace-step p {
+    line-height: 1.65;
+  }
+
+  .summary-panel strong,
+  .model-name,
+  .trace-header h3 {
+    font-size: 1.05rem;
+  }
+
+  .share-card {
+    border-radius: 18px;
   }
 }
 

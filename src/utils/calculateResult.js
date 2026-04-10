@@ -8,9 +8,6 @@ import {
 } from '../data/framework.js';
 import { questions } from '../data/questions.js';
 
-const HIGH_THRESHOLD = 62;
-const LOW_THRESHOLD = 38;
-
 const createZeroScores = () => ({ ...EMPTY_SCORES });
 
 const dimensionLimits = questions.reduce(
@@ -32,6 +29,42 @@ const dimensionLimits = questions.reduce(
 const clampPercent = (value) => Math.max(0, Math.min(100, Math.round(value)));
 
 const rankEntries = (entries) => [...entries].sort((left, right) => right.value - left.value);
+
+const randomTypeFromAll = () => personalities[Math.floor(Math.random() * personalities.length)] ?? personalities[0];
+
+const normalizePersonality = (personality) => {
+  if (!personality) {
+    return randomTypeFromAll();
+  }
+
+  if (personality.id === 'npc') {
+    return {
+      ...personality,
+      code: 'NPC',
+      name: '路人型',
+    };
+  }
+
+  return personality;
+};
+
+const VECTOR_RANGES = {
+  self: { min: 15, max: 55 },
+  emotion: { min: 5, max: 70 },
+  attitude: { min: 5, max: 70 },
+  action: { min: 8, max: 70 },
+  social: { min: 10, max: 50 },
+};
+
+const normalizeVectorValue = (key, value) => {
+  const range = VECTOR_RANGES[key];
+
+  if (!range || range.max === range.min) {
+    return clampPercent(value);
+  }
+
+  return clampPercent(((value - range.min) / (range.max - range.min)) * 100);
+};
 
 export const getDimensionPercents = (scores) =>
   DIMENSION_IDS.reduce((result, dimensionId) => {
@@ -55,93 +88,111 @@ export const getModelPercents = (dimensionPercents) =>
     return result;
   }, {});
 
-const bandScore = (value, target) => {
-  if (target === 'high') {
-    return value >= HIGH_THRESHOLD ? 14 + (value - HIGH_THRESHOLD) * 0.2 : -18;
-  }
+const average = (values) =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 50;
 
-  if (target === 'low') {
-    return value <= LOW_THRESHOLD ? 14 + (LOW_THRESHOLD - value) * 0.2 : -18;
-  }
+const getScoreValue = (source, key) => source[key] ?? 50;
 
-  return Math.max(0, 16 - Math.abs(value - 50) * 0.4);
+const buildUserVector = (dimensionPercents, modelPercents) => {
+  const rawVector = {
+    self: average([
+      getScoreValue(dimensionPercents, 'AUTONOMY'),
+      getScoreValue(dimensionPercents, 'EXIT'),
+      getScoreValue(dimensionPercents, 'CONTROL'),
+      getScoreValue(modelPercents, 'boundary'),
+      getScoreValue(modelPercents, 'strategy'),
+    ]),
+    emotion: average([
+      getScoreValue(dimensionPercents, 'REACTIVITY'),
+      getScoreValue(dimensionPercents, 'RUMINATION'),
+      getScoreValue(dimensionPercents, 'EXPRESSION'),
+      getScoreValue(modelPercents, 'emotion'),
+    ]),
+    attitude: average([
+      getScoreValue(dimensionPercents, 'CLOSENESS'),
+      getScoreValue(dimensionPercents, 'REASSURANCE'),
+      getScoreValue(dimensionPercents, 'FUSION'),
+      getScoreValue(modelPercents, 'bonding'),
+      getScoreValue(dimensionPercents, 'RULE') * 0.7,
+    ]),
+    action: average([
+      getScoreValue(dimensionPercents, 'INITIATIVE'),
+      getScoreValue(dimensionPercents, 'CONSISTENCY'),
+      getScoreValue(dimensionPercents, 'REPAIR'),
+      getScoreValue(modelPercents, 'investment'),
+      getScoreValue(dimensionPercents, 'CONTROL') * 0.6,
+    ]),
+    social: average([
+      getScoreValue(dimensionPercents, 'CLOSENESS'),
+      getScoreValue(dimensionPercents, 'EXPRESSION'),
+      getScoreValue(dimensionPercents, 'SIGNAL'),
+      getScoreValue(dimensionPercents, 'REPAIR'),
+      getScoreValue(modelPercents, 'bonding') * 0.5,
+      getScoreValue(modelPercents, 'emotion') * 0.5,
+    ]),
+  };
+
+  return Object.fromEntries(
+    Object.entries(rawVector).map(([key, value]) => [key, normalizeVectorValue(key, value)]),
+  );
 };
 
-const scoreList = (dimensionIds = [], dimensionPercents, target) =>
-  dimensionIds.reduce((sum, dimensionId) => sum + bandScore(dimensionPercents[dimensionId] ?? 50, target), 0);
+const getVectorDistance = (left, right) =>
+  average(
+    ['self', 'emotion', 'attitude', 'action', 'social'].map((key) =>
+      Math.abs((left[key] ?? 50) - (right[key] ?? 50)),
+    ),
+  );
 
-const weightedPreference = (dimensionIds = [], dimensionPercents, target) =>
-  dimensionIds.reduce((sum, dimensionId) => {
-    const value = dimensionPercents[dimensionId] ?? 50;
-
-    if (target === 'high') {
-      return sum + value * 0.14;
-    }
-
-    if (target === 'low') {
-      return sum + (100 - value) * 0.14;
-    }
-
-    return sum + Math.max(0, 16 - Math.abs(value - 50) * 0.32);
-  }, 0);
-
-const penaltyList = (dimensionIds = [], dimensionPercents, target) =>
-  dimensionIds.reduce((sum, dimensionId) => {
-    const value = dimensionPercents[dimensionId] ?? 50;
-
-    if (target === 'high' && value > 70) {
-      return sum - (value - 70) * 0.8;
-    }
-
-    if (target === 'low' && value < 30) {
-      return sum - (30 - value) * 0.8;
-    }
-
-    return sum;
-  }, 0);
+const getVectorDistinctiveness = (vector = {}) =>
+  average(
+    ['self', 'emotion', 'attitude', 'action', 'social'].map((key) =>
+      Math.abs((vector[key] ?? 50) - 50),
+    ),
+  );
 
 const scoreModelAffinity = (personality, modelPercents, rankedModels) => {
   let score = 0;
 
   if (personality.primaryModel) {
-    score += (modelPercents[personality.primaryModel] ?? 0) * 0.56;
+    score += (modelPercents[personality.primaryModel] ?? 50) * 0.18;
     if (rankedModels[0]?.id === personality.primaryModel) {
-      score += 18;
+      score += 8;
     }
   }
 
   if (personality.secondaryModel) {
-    score += (modelPercents[personality.secondaryModel] ?? 0) * 0.3;
+    score += (modelPercents[personality.secondaryModel] ?? 50) * 0.1;
     if (rankedModels.slice(0, 2).some((model) => model.id === personality.secondaryModel)) {
-      score += 10;
+      score += 4;
     }
-  }
-
-  if (personality.lowModel) {
-    score += (100 - (modelPercents[personality.lowModel] ?? 0)) * 0.28;
   }
 
   return score;
 };
 
-const scorePersonality = (personality, dimensionPercents, modelPercents, rankedModels) => {
-  let total = personality.priority ?? 0;
+const getStableHash = (scores, personalityId) =>
+  `${DIMENSION_IDS.map((dimensionId) => scores[dimensionId] ?? 0).join('|')}|${personalityId}`
+    .split('')
+    .reduce((hash, character) => ((hash * 31) + character.charCodeAt(0)) % 2147483647, 7);
 
-  total += scoreModelAffinity(personality, modelPercents, rankedModels);
-  total += scoreList(personality.requiredHighDims, dimensionPercents, 'high');
-  total += scoreList(personality.requiredLowDims, dimensionPercents, 'low');
-  total += weightedPreference(personality.preferredHighDims, dimensionPercents, 'high');
-  total += weightedPreference(personality.preferredLowDims, dimensionPercents, 'low');
-  total += weightedPreference(personality.preferredMidDims, dimensionPercents, 'mid');
-  total += penaltyList(personality.avoidHighDims, dimensionPercents, 'high');
-  total += penaltyList(personality.avoidLowDims, dimensionPercents, 'low');
+const scorePersonality = (personality, userVector, modelPercents, rankedModels, scores) => {
+  const vectorDistance = getVectorDistance(userVector, personality.vector ?? {});
+  const vectorScore = 100 - vectorDistance;
+  const modelScore = scoreModelAffinity(personality, modelPercents, rankedModels);
+  const distinctivenessScore = getVectorDistinctiveness(personality.vector) * 0.08;
+  const stableNoise = (getStableHash(scores, personality.id) % 1000) / 1000;
 
-  return total;
+  return {
+    vectorDistance,
+    score: vectorScore + modelScore + distinctivenessScore + stableNoise,
+  };
 };
 
 export const getResultType = (scores) => {
   const dimensionPercents = getDimensionPercents(scores);
   const modelPercents = getModelPercents(dimensionPercents);
+  const userVector = buildUserVector(dimensionPercents, modelPercents);
   const rankedModels = rankEntries(
     Object.entries(modelPercents).map(([id, value]) => ({ id, value })),
   );
@@ -150,7 +201,7 @@ export const getResultType = (scores) => {
     .map((personality, index) => ({
       personality,
       index,
-      score: scorePersonality(personality, dimensionPercents, modelPercents, rankedModels),
+      ...scorePersonality(personality, userVector, modelPercents, rankedModels, scores),
     }))
     .sort((left, right) => {
       if (right.score !== left.score) {
@@ -160,12 +211,37 @@ export const getResultType = (scores) => {
       return left.index - right.index;
     });
 
-  return rankedPersonalities[0]?.personality ?? personalities[0];
+  const bestMatch = rankedPersonalities[0];
+
+  if (!bestMatch || !Number.isFinite(bestMatch.score)) {
+    return randomTypeFromAll();
+  }
+
+  const runnerUp = rankedPersonalities[1];
+  const hasClearWinner = !runnerUp || bestMatch.score - runnerUp.score >= 8;
+
+  if (hasClearWinner) {
+    return normalizePersonality(bestMatch.personality);
+  }
+
+  const candidatePool = rankedPersonalities
+    .filter((entry) => bestMatch.score - entry.score <= 10)
+    .slice(0, 12);
+
+  const weightedPool = candidatePool.flatMap((entry, index) =>
+    Array.from({ length: Math.max(1, 12 - index) }, () => entry.personality),
+  );
+
+  const choiceIndex = getStableHash(scores, 'tie-breaker') % weightedPool.length;
+  return normalizePersonality(
+    weightedPool[choiceIndex] ?? bestMatch.personality ?? randomTypeFromAll(),
+  );
 };
 
 export const getFullResult = (scores) => {
   const dimensionPercents = getDimensionPercents(scores);
   const modelPercents = getModelPercents(dimensionPercents);
+  const userVector = buildUserVector(dimensionPercents, modelPercents);
   const personality = getResultType(scores);
 
   const rankedDimensions = rankEntries(
@@ -187,6 +263,7 @@ export const getFullResult = (scores) => {
 
   return {
     personality,
+    userVector,
     dimensionPercents,
     modelPercents,
     topDimensions: rankedDimensions.slice(0, 3),

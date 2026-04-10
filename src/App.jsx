@@ -37,29 +37,62 @@ const loadImage = (src) =>
     image.src = src;
   });
 
-const drawWrappedText = (context, text, x, startY, maxWidth, lineHeight) => {
-  const characters = text.split('');
+const createWrappedLines = (context, text, maxWidth) => {
+  const characters = String(text ?? '').split('');
+  const lines = [];
   let line = '';
-  let y = startY;
 
   characters.forEach((character) => {
+    if (character === '\n') {
+      lines.push(line);
+      line = '';
+      return;
+    }
+
     const testLine = `${line}${character}`;
     const metrics = context.measureText(testLine);
 
     if (metrics.width > maxWidth && line) {
-      context.fillText(line, x, y);
+      lines.push(line);
       line = character;
-      y += lineHeight;
     } else {
       line = testLine;
     }
   });
 
   if (line) {
-    context.fillText(line, x, y);
+    lines.push(line);
   }
 
-  return y;
+  return lines;
+};
+
+const drawWrappedText = (context, text, x, startY, maxWidth, lineHeight) => {
+  const lines = createWrappedLines(context, text, maxWidth);
+
+  lines.forEach((line, index) => {
+    context.fillText(line, x, startY + index * lineHeight);
+  });
+
+  return {
+    lines,
+    endY: startY + Math.max(lines.length - 1, 0) * lineHeight,
+  };
+};
+
+const fitText = (context, text, maxWidth, initialSize, minSize, weight = 700, family = 'Nunito') => {
+  let fontSize = initialSize;
+
+  while (fontSize > minSize) {
+    context.font = `${weight} ${fontSize}px ${family}, sans-serif`;
+    if (context.measureText(text).width <= maxWidth) {
+      return fontSize;
+    }
+    fontSize -= 2;
+  }
+
+  context.font = `${weight} ${minSize}px ${family}, sans-serif`;
+  return minSize;
 };
 
 const generateShareCard = async (result) => {
@@ -102,15 +135,15 @@ const generateShareCard = async (result) => {
 
   context.fillStyle = '#111111';
   context.textAlign = 'center';
-  context.font = '700 90px Fredoka, sans-serif';
+  fitText(context, result.personality.code, canvas.width - 260, 90, 66, 700, 'Fredoka');
   context.fillText(result.personality.code, canvas.width / 2, 780);
 
-  context.font = '700 54px Nunito, sans-serif';
+  fitText(context, result.personality.name, canvas.width - 260, 54, 36, 700, 'Nunito');
   context.fillText(result.personality.name, canvas.width / 2, 848);
 
   context.fillStyle = '#ff4fa3';
   context.font = '800 28px Nunito, sans-serif';
-  drawWrappedText(
+  const descriptionBlock = drawWrappedText(
     context,
     result.personality.description,
     140,
@@ -122,19 +155,20 @@ const generateShareCard = async (result) => {
   context.textAlign = 'left';
   context.fillStyle = '#111111';
   context.font = '800 26px Nunito, sans-serif';
-  context.fillText('一句话总结', 132, 1024);
+  const summaryTitleY = descriptionBlock.endY + 82;
+  context.fillText('一句话总结', 132, summaryTitleY);
 
   context.font = '400 28px Nunito, sans-serif';
-  let currentY = drawWrappedText(
+  const detailBlock = drawWrappedText(
     context,
     result.personality.detail,
     132,
-    1072,
+    summaryTitleY + 48,
     canvas.width - 264,
     44,
   );
 
-  currentY += 90;
+  let currentY = detailBlock.endY + 90;
   context.font = '800 26px Nunito, sans-serif';
   context.fillText('关键维度', 132, currentY);
 
@@ -144,7 +178,7 @@ const generateShareCard = async (result) => {
     context.fillStyle = '#111111';
     context.fillRect(x, currentY + 16, 260, 84);
     context.fillStyle = '#fff7ef';
-    context.font = '800 22px Nunito, sans-serif';
+    fitText(context, dimension.label, 220, 22, 16, 800, 'Nunito');
     context.fillText(dimension.label, x + 20, currentY + 48);
     context.font = '700 30px Fredoka, sans-serif';
     context.fillText(`${dimension.value}%`, x + 20, currentY + 82);
@@ -155,13 +189,16 @@ const generateShareCard = async (result) => {
   context.font = '800 26px Nunito, sans-serif';
   context.fillText('主导模型', 132, currentY);
   context.font = '400 28px Nunito, sans-serif';
-  context.fillText(
+  const modelBlock = drawWrappedText(
+    context,
     result.topModels.map((model) => model.name).join(' / '),
     132,
     currentY + 48,
+    canvas.width - 264,
+    40,
   );
 
-  currentY += 132;
+  currentY = modelBlock.endY + 84;
   context.strokeStyle = 'rgba(17,17,17,0.18)';
   context.beginPath();
   context.moveTo(132, currentY);
