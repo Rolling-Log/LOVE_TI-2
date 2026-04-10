@@ -1,185 +1,165 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Home from './pages/Home.jsx';
 import Quiz from './pages/Quiz.jsx';
 import Result from './pages/Result.jsx';
-import { DIMENSIONS, EMPTY_SCORES, TOTAL_QUESTIONS, questions } from './data/questions.js';
-import { getDimensionPercents, getResultType } from './utils/calculateResult.js';
+import { questions, QUESTIONS_BY_ID, TOTAL_QUESTIONS } from './data/questions.js';
+import { createEmptyScores, getFullResult, sumScores } from './utils/calculateResult.js';
 
-const createEmptyScores = () => ({ ...EMPTY_SCORES });
+const shuffle = (items) => {
+  const list = [...items];
 
-const mergeScores = (baseScores, optionScores) =>
-  DIMENSIONS.reduce((result, dimension) => {
-    result[dimension] = (baseScores[dimension] ?? 0) + (optionScores[dimension] ?? 0);
-    return result;
-  }, {});
+  for (let index = list.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [list[index], list[swapIndex]] = [list[swapIndex], list[index]];
+  }
 
-const drawWrappedText = (context, text, x, startY, maxWidth, lineHeight) => {
-  const characters = text.split('');
-  let line = '';
-  let y = startY;
+  return list;
+};
 
-  characters.forEach((character) => {
-    const testLine = `${line}${character}`;
-    const metrics = context.measureText(testLine);
+const buildQuestionOrder = () => shuffle(questions.map((question) => question.id));
 
-    if (metrics.width > maxWidth && line) {
-      context.fillText(line, x, y);
-      line = character;
-      y += lineHeight;
-    } else {
-      line = testLine;
+const buildScoresFromAnswers = (answers) =>
+  questions.reduce((scores, question) => {
+    const optionIndex = answers[question.id];
+
+    if (optionIndex === undefined) {
+      return scores;
     }
-  });
 
-  if (line) {
-    context.fillText(line, x, y);
-  }
-};
-
-const generateShareCard = (personality) => {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1080;
-  canvas.height = 1350;
-
-  const context = canvas.getContext('2d');
-
-  if (!context) {
-    return '';
-  }
-
-  context.fillStyle = '#f5f1e8';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  context.strokeStyle = 'rgba(15, 15, 15, 0.1)';
-  context.lineWidth = 1;
-
-  for (let x = 80; x < canvas.width; x += 110) {
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x, canvas.height);
-    context.stroke();
-  }
-
-  for (let y = 90; y < canvas.height; y += 110) {
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(canvas.width, y);
-    context.stroke();
-  }
-
-  context.fillStyle = '#111111';
-  context.fillRect(70, 70, canvas.width - 140, canvas.height - 140);
-
-  context.strokeStyle = '#f5f1e8';
-  context.lineWidth = 2;
-  context.strokeRect(110, 110, canvas.width - 220, canvas.height - 220);
-
-  context.fillStyle = '#f5f1e8';
-  context.font = '700 34px "Space Grotesk", "Arial Narrow", sans-serif';
-  context.fillText('LOVE-TI', 150, 180);
-
-  context.font = '400 24px "Space Grotesk", "Noto Sans SC", sans-serif';
-  context.fillText('ENTERTAINMENT RELATIONSHIP PERSONALITY', 150, 220);
-
-  context.font = '700 128px "Space Grotesk", Impact, sans-serif';
-  context.fillText(personality.code, 150, 430);
-
-  context.font = '700 44px "Noto Sans SC", sans-serif';
-  context.fillText(personality.name, 150, 510);
-
-  context.font = '400 52px "Noto Sans SC", sans-serif';
-  drawWrappedText(context, personality.description, 150, 650, 770, 76);
-
-  context.font = '400 28px "Noto Sans SC", sans-serif';
-  drawWrappedText(context, personality.advice, 150, 890, 760, 44);
-
-  context.fillRect(150, 1030, 770, 2);
-
-  context.font = '400 24px "Space Grotesk", "Noto Sans SC", sans-serif';
-  context.fillText('find out how absurd you get in love', 150, 1085);
-  context.fillText('love-ti / made for screenshots and public embarrassment', 150, 1135);
-
-  return canvas.toDataURL('image/png');
-};
+    return sumScores(scores, question.options[optionIndex].score);
+  }, createEmptyScores());
 
 function App() {
   const [page, setPage] = useState('home');
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [scores, setScores] = useState(createEmptyScores);
+  const [questionOrder, setQuestionOrder] = useState(() => buildQuestionOrder());
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
-  const [shareImage, setShareImage] = useState('');
+  const [logicOpen, setLogicOpen] = useState(false);
+
+  const answeredCount = Object.keys(answers).length;
+  const remainingCount = TOTAL_QUESTIONS - answeredCount;
+  const currentQuestionId = questionOrder[currentIndex];
+  const currentQuestion = QUESTIONS_BY_ID[currentQuestionId];
+
+  const orderedQuestions = useMemo(
+    () => questionOrder.map((questionId) => QUESTIONS_BY_ID[questionId]),
+    [questionOrder],
+  );
+
+  const finishQuiz = (nextAnswers) => {
+    const scores = buildScoresFromAnswers(nextAnswers);
+    const nextResult = getFullResult(scores);
+
+    setResult({
+      ...nextResult,
+      scores,
+      answers: nextAnswers,
+      questionOrder,
+    });
+    setPage('result');
+  };
 
   const handleStart = () => {
-    setScores(createEmptyScores());
-    setCurrentQuestionIndex(0);
+    setQuestionOrder(buildQuestionOrder());
+    setCurrentIndex(0);
+    setAnswers({});
     setResult(null);
-    setShareImage('');
+    setLogicOpen(false);
     setPage('quiz');
   };
 
-  const handleAnswer = (optionScore) => {
-    const nextScores = mergeScores(scores, optionScore);
+  const jumpToFirstUnanswered = (nextAnswers = answers) => {
+    const unansweredIndex = questionOrder.findIndex((questionId) => nextAnswers[questionId] === undefined);
 
-    if (currentQuestionIndex === TOTAL_QUESTIONS - 1) {
-      const personality = getResultType(nextScores);
-      const percents = getDimensionPercents(nextScores);
+    if (unansweredIndex >= 0) {
+      setCurrentIndex(unansweredIndex);
+    }
+  };
 
-      setScores(nextScores);
-      setResult({
-        personality,
-        percents,
-        scores: nextScores,
-      });
-      setPage('result');
-      setCurrentQuestionIndex(TOTAL_QUESTIONS);
+  const handleSelectOption = (questionId, optionIndex) => {
+    const nextAnswers = {
+      ...answers,
+      [questionId]: optionIndex,
+    };
+
+    setAnswers(nextAnswers);
+
+    const nextAnsweredCount = Object.keys(nextAnswers).length;
+    const isLastQuestion = currentIndex === TOTAL_QUESTIONS - 1;
+
+    if (isLastQuestion && nextAnsweredCount === TOTAL_QUESTIONS) {
+      finishQuiz(nextAnswers);
       return;
     }
 
-    setScores(nextScores);
-    setCurrentQuestionIndex((previous) => previous + 1);
+    if (currentIndex < TOTAL_QUESTIONS - 1) {
+      setCurrentIndex((previous) => previous + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((previous) => Math.max(0, previous - 1));
+  };
+
+  const handleNext = () => {
+    if (currentIndex === TOTAL_QUESTIONS - 1) {
+      if (remainingCount === 0) {
+        finishQuiz(answers);
+        return;
+      }
+
+      jumpToFirstUnanswered();
+      return;
+    }
+
+    setCurrentIndex((previous) => Math.min(TOTAL_QUESTIONS - 1, previous + 1));
+  };
+
+  const handleJump = (index) => {
+    setCurrentIndex(index);
   };
 
   const handleRestart = () => {
-    setScores(createEmptyScores());
-    setCurrentQuestionIndex(0);
-    setResult(null);
-    setShareImage('');
     setPage('home');
-  };
-
-  const handleGenerateShare = () => {
-    if (!result) {
-      return;
-    }
-
-    const image = generateShareCard(result.personality);
-    setShareImage(image);
-  };
-
-  const closeShareImage = () => {
-    setShareImage('');
+    setCurrentIndex(0);
+    setAnswers({});
+    setResult(null);
+    setLogicOpen(false);
   };
 
   return (
     <main className="app-shell">
-      {page === 'home' ? <Home onStart={handleStart} /> : null}
+      {page === 'home' ? (
+        <Home
+          onStart={handleStart}
+          logicOpen={logicOpen}
+          onOpenLogic={() => setLogicOpen(true)}
+          onCloseLogic={() => setLogicOpen(false)}
+        />
+      ) : null}
 
-      {page === 'quiz' ? (
+      {page === 'quiz' && currentQuestion ? (
         <Quiz
-          currentQuestion={questions[currentQuestionIndex]}
-          currentIndex={currentQuestionIndex}
-          totalQuestions={TOTAL_QUESTIONS}
-          onAnswer={handleAnswer}
+          currentQuestion={currentQuestion}
+          currentIndex={currentIndex}
+          orderedQuestions={orderedQuestions}
+          answers={answers}
+          remainingCount={remainingCount}
+          onSelectOption={handleSelectOption}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onJump={handleJump}
+          onFinish={() => finishQuiz(answers)}
         />
       ) : null}
 
       {page === 'result' && result ? (
         <Result
           result={result}
+          orderedQuestions={orderedQuestions}
           onRestart={handleRestart}
-          onGenerateShare={handleGenerateShare}
-          shareImage={shareImage}
-          onCloseShare={closeShareImage}
+          onRetake={handleStart}
         />
       ) : null}
     </main>
